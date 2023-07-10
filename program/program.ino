@@ -1,64 +1,61 @@
 #include "BluetoothSerial.h"
+#include "M5_ENV.h"
 #include <M5Stack.h>
 
-// SHT3X (温度、湿度センサ) I2C通信アドレス
-#define SHT3X_ADDR 0x44
+// SHT30 (温度、湿度センサ)
+SHT3X sht30;
 
+// Bluetooth
 BluetoothSerial bts;
+
+float temperature = 0.0;
+float humidity = 0.0;
 
 void setup()
 {
     M5.begin();
+    M5.Power.begin();
 
     // Bluetooth
     bts.begin("Sensor Network C-team");
 
     // I2C
-    Wire.begin(32, 33);
+    Wire.begin();
 
     // 液晶
     M5.Lcd.setTextColor(WHITE);
-    M5.Lcd.setTextSize(1);
+    M5.Lcd.setTextSize(2);
     M5.Lcd.setTextDatum(4);
 }
 
-void getEnvirons(float environs[2])
+// 温度と湿度を取得
+void getEnvirons()
 {
-    // 温度、湿度データ一時格納用
-    unsigned int data[6];
-
-    // I2C
-    Wire.beginTransmission(SHT3X_ADDR);
-    Wire.write(0x2C);
-    Wire.write(0x06);
-    Wire.endTransmission(true);
-
-    // データ取得
-    Wire.requestFrom(SHT3X_ADDR, 6);
-    for (int i = 0; i < 6; i++)
+    if (sht30.get() == 0)
     {
-        data[i] = Wire.read();
+        temperature = sht30.cTemp;
+        humidity = sht30.humidity;
     }
-
-    // 温度
-    environs[0] = ((((data[0] * 256.0) + data[1]) * 175) / 65535.0) - 45;
-    // 湿度
-    environs[1] = ((((data[3] * 256.0) + data[4]) * 100) / 65535.0);
+    else
+    {
+        temperature = 0;
+        humidity = 0;
+    }
 }
 
 void loop()
 {
-    float environs[2] = {0.0, 0.0};
-    getEnvirons(environs);
+    // 温度と湿度を取得
+    getEnvirons();
 
     // Bluetooth通信
-    bts.println(environs[0]);
+    bts.println(temperature);
 
     // 液晶表示
     M5.lcd.setCursor(5, 50);
-    M5.Lcd.printf("Temperature: %2.1f'C  ", environs[0]);
+    M5.Lcd.printf("Temperature: %2.1f'C", temperature);
     M5.lcd.setCursor(5, 80);
-    M5.Lcd.printf("Humidity: %2.0f%%  ", environs[1]);
+    M5.Lcd.printf("Humidity: %2.0f%%", humidity);
 
     delay(1000);
 }
